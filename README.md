@@ -1,3 +1,6 @@
+# 总结
+- 可以在桌面运行：`./elf2tab.exe -o blink.tab -n blink --stack 1024 --app-heap 1024 --kernel-heap 1024 cortex-m4.elf`
+
 # ![elf2tab](http://www.tockos.org/assets/img/elf2tab.svg "elf2tab Logo")
 
 `elf2tab` is a tool that converts [Tock](https://github.com/tock/tock) userland
