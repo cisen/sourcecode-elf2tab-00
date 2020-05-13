@@ -1,0 +1,3 @@
+cargo:rerun-if-env-changed=PLATFORM
+cargo:rerun-if-changed=platform
+cargo:rustc-env=PLATFORM=nrf52

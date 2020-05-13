@@ -1,0 +1,1 @@
+{"rustc":8344811746668040344,"features":"","target":0,"profile":0,"path":0,"deps":[[3084603606196840699,"build_script_build",false,14547791728547981014]],"local":[{"RerunIfChanged":{"output":"thumbv7em-none-eabi/debug/build/libtock-8a845be15598c440/output","paths":["platform"]}},{"RerunIfEnvChanged":{"var":"PLATFORM","val":"nrf52"}}],"rustflags":[],"metadata":0}

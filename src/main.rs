@@ -18,6 +18,7 @@ mod header;
 use structopt::StructOpt;
 
 fn main() {
+    // 格式化命令
     let opt = cmdline::Opt::from_args();
 
     let package_name = opt
