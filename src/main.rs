@@ -28,6 +28,7 @@ fn main() {
 
     // Create the metadata.toml file needed for the TAB file.
     let mut metadata_toml = String::new();
+    // 拼接一个这样的字符串："tab-version = 1\nname = \"blink\"\nonly-for-boards = \"\"\nbuild-date = 2020-05-13T14:55:10Z\n"
     writeln!(&mut metadata_toml, "tab-version = 1").unwrap();
     writeln!(&mut metadata_toml, "name = \"{}\"", package_name).unwrap();
     writeln!(&mut metadata_toml, "only-for-boards = \"\"").unwrap();
@@ -37,11 +38,14 @@ fn main() {
     }
 
     // Start creating a tar archive which will be the .tab file.
+    // 根据文件名创建一个文件
     let tab_name = fs::File::create(&opt.output).expect("Could not create the output file.");
     let mut tab = tar::Builder::new(tab_name);
     tab.mode(tar::HeaderMode::Deterministic);
 
     // Add the metadata file without creating a real file on the filesystem.
+    // 不在真正的文件系统里面添加metadata，主要用于存放构建信息包括：tab版本/包名/适合的主板/构建日期
+    // metadata的说明：https://github.com/tock/tock/blob/74b8693a903aa187f7832ea6bda85265690ecd76/doc/Compilation.md#metadata
     let mut header = tar::Header::new_gnu();
     header.set_size(metadata_toml.as_bytes().len() as u64);
     header.set_mode(0o644);
@@ -51,9 +55,11 @@ fn main() {
 
     // Iterate all input elfs. Convert them to Tock friendly binaries and then
     // add them to the TAB file.
+    // 遍历所有的elf文件，然后将他们转化为tfb文件，在将他们统一存放到tab文件里面
     for elf_path in opt.input {
+        // 改成tbf后缀
         let tbf_path = elf_path.with_extension("tbf");
-
+        // 使用elf包读取elf文件
         let elffile = elf::File::open_path(&elf_path).expect("Could not open the .elf file.");
 
         if opt.output.clone() == tbf_path.clone() {
@@ -66,6 +72,7 @@ fn main() {
 
         // Get output file as both read/write for creating the binary and
         // adding it to the TAB tar file.
+        // 复制并创建出可读可写的tar文件
         let mut outfile: fs::File = fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -75,6 +82,7 @@ fn main() {
             .unwrap();
 
         // Do the conversion to a tock binary.
+        // 将elf文件转化为tab文件
         elf_to_tbf(
             &elffile,
             &mut outfile,
@@ -125,6 +133,7 @@ fn elf_to_tbf<W: Write>(
 
     // Get an array of the sections sorted so we place them in the proper order
     // in the binary.
+    // 遍历elf的section并且排序
     let mut sections_sort: Vec<(usize, usize)> = Vec::new();
     for (i, section) in input.sections.iter().enumerate() {
         sections_sort.push((i, section.shdr.offset as usize));
@@ -132,6 +141,7 @@ fn elf_to_tbf<W: Write>(
     sections_sort.sort_by_key(|s| s.1);
 
     // Keep track of how much RAM this app will need.
+    // 追踪这个app需要的最小的RAM
     let mut minimum_ram_size: u32 = 0;
 
     // Find the ELF segment for the RAM segment. That will tell us how much
