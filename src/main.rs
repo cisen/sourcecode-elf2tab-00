@@ -146,6 +146,7 @@ fn elf_to_tbf<W: Write>(
 
     // Find the ELF segment for the RAM segment. That will tell us how much
     // RAM we need to reserve for when those are copied into memory.
+    // 为了知道需要多少RAM，复制的时候找出elf文件的elf segment, 用elf segment去设置RAM segment。
     for segment in &input.phdrs {
         if segment.progtype == elf::types::PT_LOAD
             && segment.flags.0 == elf::types::PF_W.0 + elf::types::PF_R.0
@@ -163,13 +164,16 @@ fn elf_to_tbf<W: Write>(
 
     // Add in room the app is asking us to reserve for the stack and heaps to
     // the minimum required RAM size.
+    // 除了segment区，还要添加栈/堆/和内核保留
     minimum_ram_size += align8!(stack_len) + align4!(app_heap_len) + align4!(kernel_heap_len);
 
     // Need an array of sections to look for relocation data to include.
+    // 需要一个数组来查找要包括的重定位数据。
     let mut rel_sections: Vec<String> = Vec::new();
 
     // Iterate the sections in the ELF file to find properties of the app that
     // are required to go in the TBF header.
+    // 遍历ELF文件中的部分，以查找进入TBF标头所需的应用程序属性。
     let mut writeable_flash_regions_count = 0;
 
     for s in &sections_sort {
