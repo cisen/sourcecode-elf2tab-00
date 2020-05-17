@@ -114,11 +114,19 @@ fn main() {
 /// into a binary and prepend a TBF header to it. For all writeable sections,
 /// if there is a .rel.X section it will be included at the end with a 32 bit
 /// length parameter first.
+/// 这会将ELF文件中的所有可写和可执行部分放入二进制文件中，并在其前面添加一个TBF标头。
+///  对于所有可写节，如果有一个.rel.X节，它将在末尾包含32位长度的参数。
 ///
 /// Assumptions:
 /// - Sections in a segment that is RW and set to be loaded will be in RAM and
 ///   should count towards minimum required RAM.
 /// - Sections that are writeable flash regions include .wfr in their name.
+// 假设：
+// -RW段中设置为要加载的段将位于RAM中，并应计入所需的最小RAM中。
+// -可写闪存区域的部分名称中包括.wfr。
+//
+
+// input就是elf的File格式文件
 fn elf_to_tbf<W: Write>(
     input: &elf::File,
     output: &mut W,
@@ -164,7 +172,7 @@ fn elf_to_tbf<W: Write>(
 
     // Add in room the app is asking us to reserve for the stack and heaps to
     // the minimum required RAM size.
-    // 除了segment区，还要添加栈/堆/和内核保留
+    // 除了segment区，还要添加栈/堆/和内核保留空间，并最终计算得到最小内存
     minimum_ram_size += align8!(stack_len) + align4!(app_heap_len) + align4!(kernel_heap_len);
 
     // Need an array of sections to look for relocation data to include.
@@ -180,11 +188,13 @@ fn elf_to_tbf<W: Write>(
         let section = &input.sections[s.0];
 
         // Count write only sections as writeable flash regions.
+        // 计算只能写的sections作为可写的flash寄存器
         if section.shdr.name.contains(".wfr") && section.shdr.size > 0 {
             writeable_flash_regions_count += 1;
         }
 
         // Check write+alloc sections for possible .rel.X sections.
+        // 检查可写可分配的section给.rel.x
         if section.shdr.flags.0 == elf::types::SHF_WRITE.0 + elf::types::SHF_ALLOC.0 {
             // This section is also one we might need to include relocation
             // data for.
@@ -211,6 +221,7 @@ fn elf_to_tbf<W: Write>(
     );
     // If a protected region size was passed, confirm the header will fit.
     // Otherwise, use the header size as the protected region size.
+    // 如果通过了受保护的区域大小，请确认标题适合。 否则，将标头大小用作保护区域大小。
     let protected_region_size =
         if let Some(fixed_protected_region_size) = protected_region_size_arg {
             if fixed_protected_region_size < header_length as u32 {
