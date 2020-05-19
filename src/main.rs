@@ -109,16 +109,21 @@ fn main() {
 }
 
 /// Convert an ELF file to a TBF (Tock Binary Format) binary file.
+/// 转换elf到tbf二进制文件
 ///
 /// This will place all writeable and executable sections from the ELF file
 /// into a binary and prepend a TBF header to it. For all writeable sections,
 /// if there is a .rel.X section it will be included at the end with a 32 bit
 /// length parameter first.
+// 这会将ELF文件中的所有可写和可执行部分放入二进制文件中，并在其前面添加一个TBF标头。 对于所有可写节，如果有一个.rel.X节，它将在末尾包含32位长度的参数。
 ///
 /// Assumptions:
 /// - Sections in a segment that is RW and set to be loaded will be in RAM and
 ///   should count towards minimum required RAM.
 /// - Sections that are writeable flash regions include .wfr in their name.
+// 假设：
+// -RW段中设置为要加载的段将位于RAM中，并应计入所需的最小RAM中。
+// -可写闪存区域的部分名称中包括.wfr。
 fn elf_to_tbf<W: Write>(
     input: &elf::File,
     output: &mut W,
