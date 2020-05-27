@@ -115,7 +115,12 @@ fn main() {
 /// into a binary and prepend a TBF header to it. For all writeable sections,
 /// if there is a .rel.X section it will be included at the end with a 32 bit
 /// length parameter first.
+<<<<<<< HEAD
 // 这会将ELF文件中的所有可写和可执行部分放入二进制文件中，并在其前面添加一个TBF标头。 对于所有可写节，如果有一个.rel.X节，它将在末尾包含32位长度的参数。
+=======
+/// 这会将ELF文件中的所有可写和可执行部分放入二进制文件中，并在其前面添加一个TBF标头。
+///  对于所有可写节，如果有一个.rel.X节，它将在末尾包含32位长度的参数。
+>>>>>>> 9f1f8ba47506c120207976f12140e7e6acef4956
 ///
 /// Assumptions:
 /// - Sections in a segment that is RW and set to be loaded will be in RAM and
@@ -124,6 +129,12 @@ fn main() {
 // 假设：
 // -RW段中设置为要加载的段将位于RAM中，并应计入所需的最小RAM中。
 // -可写闪存区域的部分名称中包括.wfr。
+<<<<<<< HEAD
+=======
+//
+
+// input就是elf的File格式文件
+>>>>>>> 9f1f8ba47506c120207976f12140e7e6acef4956
 fn elf_to_tbf<W: Write>(
     input: &elf::File,
     output: &mut W,
@@ -132,6 +143,7 @@ fn elf_to_tbf<W: Write>(
     stack_len: u32,
     app_heap_len: u32,
     kernel_heap_len: u32,
+    // protected_region_size_arg是可在命令中输入的限制保护的内存大小
     protected_region_size_arg: Option<u32>,
 ) -> io::Result<()> {
     let package_name = package_name.unwrap_or_default();
@@ -169,7 +181,7 @@ fn elf_to_tbf<W: Write>(
 
     // Add in room the app is asking us to reserve for the stack and heaps to
     // the minimum required RAM size.
-    // 除了segment区，还要添加栈/堆/和内核保留
+    // 除了segment区，还要添加栈/堆/和内核保留空间，并最终计算得到最小内存
     minimum_ram_size += align8!(stack_len) + align4!(app_heap_len) + align4!(kernel_heap_len);
 
     // Need an array of sections to look for relocation data to include.
@@ -185,11 +197,24 @@ fn elf_to_tbf<W: Write>(
         let section = &input.sections[s.0];
 
         // Count write only sections as writeable flash regions.
+<<<<<<< Updated upstream
+        // 计算只能写的sections作为可写的flash寄存器
+=======
+        // shdr是section header的意思
+        // 如果section header的name如果包含.wfr（writeable_flash_regions 可写flash区域）
+        // sh_name:1b 00 00 00包含一个字节偏移量，是相对于名称字符串表.shstrtab的偏移量
+>>>>>>> Stashed changes
         if section.shdr.name.contains(".wfr") && section.shdr.size > 0 {
+            // 可写flash区域 总数+1
             writeable_flash_regions_count += 1;
         }
 
         // Check write+alloc sections for possible .rel.X sections.
+<<<<<<< Updated upstream
+        // 检查可写可分配的section给.rel.x
+=======
+        // 检查需要写入和分配的section
+>>>>>>> Stashed changes
         if section.shdr.flags.0 == elf::types::SHF_WRITE.0 + elf::types::SHF_ALLOC.0 {
             // This section is also one we might need to include relocation
             // data for.
@@ -209,6 +234,7 @@ fn elf_to_tbf<W: Write>(
     // Now we can create the first pass TBF header. This is mostly to get the
     // size of the header since we have to fill in some of the offsets later.
     let mut tbfheader = header::TbfHeader::new();
+    // 计算头部的长度
     let header_length = tbfheader.create(
         minimum_ram_size,
         writeable_flash_regions_count,
@@ -216,8 +242,15 @@ fn elf_to_tbf<W: Write>(
     );
     // If a protected region size was passed, confirm the header will fit.
     // Otherwise, use the header size as the protected region size.
+<<<<<<< Updated upstream
+    // 如果通过了受保护的区域大小，请确认标题适合。 否则，将标头大小用作保护区域大小。
+=======
+    // 如果用户传入了限制保护内存大小，则设置
+>>>>>>> Stashed changes
     let protected_region_size =
+        // protected_region_size_arg在命令中是可选的
         if let Some(fixed_protected_region_size) = protected_region_size_arg {
+            // 如果可分配空间小于申请空间，则计算是否满足并将剩余空间存储到tbfheader.hdr_main.protected_size中
             if fixed_protected_region_size < header_length as u32 {
                 // The header doesn't fit in the provided protected region size;
                 // throw an error.
@@ -230,12 +263,15 @@ fn elf_to_tbf<W: Write>(
             }
             // Update the header's protected size, as the protected region may
             // be larger than the header size.
+            // 更新标题的保护大小，因为保护区域可能大于标题的大小。
             tbfheader.set_protected_size(fixed_protected_region_size - header_length as u32);
 
             fixed_protected_region_size
         } else {
+            // 如果用户没有输入protected_region_size_arg，则直接返回header_length
             header_length as u32
         };
+    // 指向这个app的header结束位置
     binary_index += protected_region_size as usize;
 
     // The init function is where the app will start executing, defined as an
@@ -244,19 +280,24 @@ fn elf_to_tbf<W: Write>(
     // calculate the offset we need to find which section includes the entry
     // function and then determine its offset relative to the end of the
     // protected region.
+    // 应用程序将在其中开始执行init函数，定义为距应用程序开头Flash中受保护区域的末尾的偏移量。
+    // 通常，受保护区域仅包括TBF标头。 要计算偏移量，我们需要找到包含入口函数的部分，然后确定其相对于受保护区域末端的偏移量。
     let mut init_fn_offset: u32 = 0;
 
     // Need a place to put the app sections before we know the true TBF header.
+    // 在我们知道真正的TBF标头之前，需要放置一个应用程序部分。
     let mut binary: Vec<u8> = vec![0; protected_region_size as usize - header_length];
 
     let mut entry_point_found = false;
 
     // Iterate the sections in the ELF file and add them to the binary as needed
+    // 迭代ELF文件中的部分，并根据需要将其添加到二进制文件中
     for s in &sections_sort {
         let section = &input.sections[s.0];
 
         // Determine if this is the section where the entry point is in. If it
         // is, then we need to calculate the correct init_fn_offset.
+        // 确定这是否是入口点所在的部分。如果是，则我们需要计算正确的init_fn_offset。
         if input.ehdr.entry >= section.shdr.addr
             && input.ehdr.entry < (section.shdr.addr + section.shdr.size)
             && (section.shdr.name.find("debug")).is_none()
@@ -272,12 +313,14 @@ fn elf_to_tbf<W: Write>(
             }
             // init_fn_offset is specified relative to the end of the TBF
             // header.
+            // init_fn_offset是相对于TBF标头的末尾指定的。
             init_fn_offset = (input.ehdr.entry - section.shdr.addr) as u32
                 + (binary_index - header_length) as u32
         }
 
         // If this is writeable, executable, or allocated, is nonzero length,
         // and is type `PROGBITS` we want to add it to the binary.
+        // 如果它是可写的，可执行的或已分配的，且长度不为零，并且类型为PROGBITS，则要将其添加到二进制文件中。
         if (section.shdr.flags.0
             & (elf::types::SHF_WRITE.0 + elf::types::SHF_EXECINSTR.0 + elf::types::SHF_ALLOC.0)
             != 0)
@@ -302,6 +345,7 @@ fn elf_to_tbf<W: Write>(
 
             // Check if this is a writeable flash region. If so, we need to
             // set the offset and size in the header.
+            // 检查这是否是可写的闪存区域。 如果是这样，我们需要在标题中设置偏移量和大小。
             if section.shdr.name.contains(".wfr") && section.shdr.size > 0 {
                 tbfheader.set_writeable_flash_region_values(
                     binary_index as u32,
@@ -310,19 +354,23 @@ fn elf_to_tbf<W: Write>(
             }
 
             // Now increment where we are in the binary.
+            // 现在增加我们在二进制文件中的位置。
             binary_index += section.shdr.size as usize;
         }
     }
 
     // Now that we have checked all of the sections, we can set the
     // init_fn_offset.
+    // 现在我们已经检查了所有部分，我们可以设置init_fn_offset。
     tbfheader.set_init_fn_offset(init_fn_offset);
 
     // Next we have to add in any relocation data.
+    // 接下来，我们必须添加任何重定位数据。
     let mut relocation_binary: Vec<u8> = Vec::new();
 
     // For each section that might have relocation data, check if a .rel.X
     // section exists and if so include it.
+    // 对于每个可能具有重定位数据的节，请检查是否存在.rel.X节，如果存在，则包括它。
     if verbose {
         println!("Searching for .rel.X sections to add.");
     }
@@ -356,11 +404,13 @@ fn elf_to_tbf<W: Write>(
 
     // Add the relocation data to our total length. Also include the 4 bytes for
     // the relocation data length.
+    // 将重定位数据添加到我们的总长度中。 还包括4个字节的重定位数据长度。
     binary_index += relocation_binary.len() + mem::size_of::<u32>();
 
     // That is everything that we are going to include in our app binary. Now
     // we need to pad the binary to a power of 2 in size, and make sure it is
     // at least 512 bytes in size.
+    // 这就是我们将要包含在应用程序二进制文件中的所有内容。 现在我们需要将二进制填充为2的幂，并确保其大小至少为512字节。
     let post_content_pad = if binary_index.count_ones() > 1 {
         let power2len = cmp::max(1 << (32 - (binary_index as u32).leading_zeros()), 512);
         power2len - binary_index
@@ -371,6 +421,7 @@ fn elf_to_tbf<W: Write>(
     let total_size = binary_index;
 
     // Now set the total size of the app in the header.
+    // 现在，在标题中设置应用程序的总大小。
     tbfheader.set_total_size(total_size as u32);
 
     if verbose {
@@ -378,6 +429,7 @@ fn elf_to_tbf<W: Write>(
     }
 
     // Write the header and actual app to a binary file.
+    // 将标头和实际应用程序写入二进制文件。
     output.write_all(tbfheader.generate().unwrap().get_ref())?;
     output.write_all(binary.as_ref())?;
 
@@ -386,6 +438,7 @@ fn elf_to_tbf<W: Write>(
     output.write_all(relocation_binary.as_ref())?;
 
     // Pad to get a power of 2 sized flash app.
+    // 使用Pad可获得2大小的Flash应用的强大功能。
     util::do_pad(output, post_content_pad as usize)?;
 
     Ok(())
